@@ -1,5 +1,5 @@
-import { desktopCapturer, screen } from 'electron';
 import fs from 'fs';
+import { desktopCapturer, screen } from 'electron';
 import os from 'os';
 import path from 'path';
 import { keyboard, mouse, Point, Button } from '@nut-tree-fork/nut-js';
@@ -20,6 +20,76 @@ type NextAction =
   | { type: 'finish' }
   | { type: 'error'; message: string };
 
+function getScreenDimensions(): { width: number; height: number } {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  return primaryDisplay.size;
+}
+
+function getAiScaledScreenDimensions(): { width: number; height: number } {
+  const { width, height } = getScreenDimensions();
+  const aspectRatio = width / height;
+
+  let scaledWidth: number;
+  let scaledHeight: number;
+
+  if (aspectRatio > 1280 / 800) {
+    // Width is the limiting factor
+    scaledWidth = 1280;
+    scaledHeight = Math.round(1280 / aspectRatio);
+  } else {
+    // Height is the limiting factor
+    scaledHeight = 800;
+    scaledWidth = Math.round(800 * aspectRatio);
+  }
+
+  return { width: scaledWidth, height: scaledHeight };
+}
+
+const getScreenshot = async () => {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.size;
+  const aiDimensions = getAiScaledScreenDimensions();
+
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width, height },
+    });
+    const primarySource = sources[0]; // Assuming the first source is the primary display
+
+    if (primarySource) {
+      const screenshot = primarySource.thumbnail;
+      // Resize the screenshot to AI dimensions
+      const resizedScreenshot = screenshot.resize(aiDimensions);
+      // Convert the resized screenshot to a base64-encoded PNG
+      const base64Image = resizedScreenshot.toPNG().toString('base64');
+      return `data:image/png;base64,${base64Image}`;
+    }
+    throw new Error('No display found for screenshot');
+  } catch (error) {
+    console.error('Error capturing screenshot:', error);
+    throw error;
+  }
+};
+
+const mapToAiSpace = (x: number, y: number) => {
+  const { width, height } = getScreenDimensions();
+  const aiDimensions = getAiScaledScreenDimensions();
+  return {
+    x: (x * aiDimensions.width) / width,
+    y: (y * aiDimensions.height) / height,
+  };
+};
+
+const mapFromAiSpace = (x: number, y: number) => {
+  const { width, height } = getScreenDimensions();
+  const aiDimensions = getAiScaledScreenDimensions();
+  return {
+    x: (x * width) / aiDimensions.width,
+    y: (y * height) / aiDimensions.height,
+  };
+};
+
 const getNextAction = async (
   instructions: string,
 ): Promise<{ action: NextAction; reasoning?: string }> => {
@@ -30,13 +100,13 @@ const getNextAction = async (
       {
         type: 'computer_20241022',
         name: 'computer',
-        display_width_px: 1024,
-        display_height_px: 768,
+        display_width_px: getAiScaledScreenDimensions().width,
+        display_height_px: getAiScaledScreenDimensions().height,
         display_number: 1,
       },
     ],
     system: `The user will ask you to perform a task and you should use their computer to do so. After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. Explicitly show your thinking: "I have evaluated step X..." If not correct, try again. Only when you confirm a step was executed correctly should you move on to the next one.`,
-    messages: [{ role: 'user', content: 'move the mouse to position 5, 5' }],
+    messages: [{ role: 'user', content: instructions }],
     betas: ['computer-use-2024-10-22'],
   });
 
@@ -157,6 +227,10 @@ export const performAction = async (action: NextAction) => {
     case 'cursor_position':
       const position = await mouse.getPosition();
       console.log(`Cursor position: x=${position.x}, y=${position.y}`);
+      break;
+    case 'screenshot':
+      const screenshot = await getScreenshot();
+      console.log('SCREENSHOT', screenshot);
       break;
     default:
       console.warn(`Unsupported action: ${action.type}`);
