@@ -9,6 +9,7 @@ import {
   RadioGroup,
   Radio,
   HStack,
+  extendTheme,
 } from '@chakra-ui/react';
 import { FaGithub } from 'react-icons/fa';
 
@@ -32,7 +33,6 @@ function Hello() {
           width="100%"
           height="100px"
           p={4}
-          mb={4}
           borderRadius="16px"
           border="1px solid"
           borderColor="rgba(112, 107, 87, 0.5)"
@@ -77,7 +77,7 @@ function Hello() {
             border="1px solid"
             borderColor="blackAlpha.200"
           >
-            Let's Go
+            Let&apos;s Go
           </Button>
         </HStack>
       </VStack>
@@ -85,9 +85,19 @@ function Hello() {
   );
 }
 
+const theme = extendTheme({
+  styles: {
+    global: {
+      body: {
+        color: 'rgb(83, 81, 70)',
+      },
+    },
+  },
+});
+
 export default function App() {
   return (
-    <ChakraProvider>
+    <ChakraProvider theme={theme}>
       <Box bg="rgb(240, 238, 229)" minHeight="100vh">
         <Router>
           <Routes>
