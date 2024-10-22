@@ -1,28 +1,44 @@
-import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import {
-  ChakraProvider,
   Box,
-  VStack,
-  Heading,
   Button,
-  Link,
-  RadioGroup,
-  Radio,
+  ChakraProvider,
   HStack,
+  Heading,
+  Link,
+  Radio,
+  RadioGroup,
+  VStack,
   extendTheme,
 } from '@chakra-ui/react';
 import { FaGithub } from 'react-icons/fa';
-import { useStore } from './hooks/useStore';
+import { Route, MemoryRouter as Router, Routes } from 'react-router-dom';
 import { useDispatch } from 'zutron';
+import { useStore } from './hooks/useStore';
+import { useState } from 'react';
 
 function TestZustand() {
   const { counter } = useStore();
   const dispatch = useDispatch(window.zutron);
-  const onClick = () => dispatch('COUNTER:SET', counter + 5);
+
+  const onClick = () => dispatch({ type: 'SET_COUNTER', payload: counter + 3 });
   return <Box onClick={onClick}>{counter}</Box>;
 }
 
 function Main() {
+  const dispatch = useDispatch(window.zutron);
+  const [instructions, setInstructions] = useState('');
+  const [humanSupervised, setHumanSupervised] = useState(true);
+
+  const startRun = () =>
+    dispatch({ type: 'START_RUN', payload: { instructions, humanSupervised } });
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.metaKey && !e.shiftKey) {
+      e.preventDefault();
+      startRun();
+    }
+  };
+
   return (
     <Box position="relative" w="100%" h="100vh" p={4}>
       <Box position="absolute" top={0} right={0}>
@@ -56,9 +72,15 @@ function Main() {
             outline: 'none',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
           }}
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          onKeyDown={handleKeyDown}
         />
         <HStack justify="space-between" align="center" w="100%">
-          <RadioGroup defaultValue="human">
+          <RadioGroup
+            value={humanSupervised ? 'human' : 'lucky'}
+            onChange={(value) => setHumanSupervised(value === 'human')}
+          >
             <HStack spacing={4}>
               <Radio value="human" bg="whiteAlpha.700">
                 Human Supervised
@@ -70,9 +92,7 @@ function Main() {
           </RadioGroup>
           <Button
             bg="transparent"
-            fontFamily="Garamond, serif"
-            fontWeight="hairline"
-            fontSize="xl"
+            fontWeight="normal"
             _hover={{
               bg: 'whiteAlpha.500',
               borderColor: 'blackAlpha.300',
@@ -85,12 +105,14 @@ function Main() {
             borderRadius="12px"
             border="1px solid"
             borderColor="blackAlpha.200"
+            onClick={startRun}
+            isDisabled={instructions.trim() === ''}
           >
             Let&apos;s Go
           </Button>
         </HStack>
       </VStack>
-      <TestZustand />
+      {/* <TestZustand /> */}
     </Box>
   );
 }

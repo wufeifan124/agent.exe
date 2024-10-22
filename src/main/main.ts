@@ -115,7 +115,7 @@ const createWindow = async () => {
   new AppUpdater();
 
   const { unsubscribe } = mainZustandBridge(ipcMain, store, [mainWindow], {
-    reducer: rootReducer,
+    // reducer: rootReducer,
   });
 
   app.on('quit', unsubscribe);

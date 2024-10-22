@@ -84,10 +84,12 @@
     }
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
     "@chakra-ui/react": "^2.10.3",
     "@electron/notarize": "^2.3.2",
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
+    "@nut-tree-fork/nut-js": "^4.2.2",
     "electron-debug": "^3.2.0",
     "electron-log": "^4.4.8",
     "electron-updater": "^6.1.4",
