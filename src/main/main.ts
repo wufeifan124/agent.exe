@@ -8,12 +8,15 @@
  * When running `npm run build` or `npm run build:main`, this file is compiled to
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
-import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import log from 'electron-log';
+import { autoUpdater } from 'electron-updater';
+import path from 'path';
+import { mainZustandBridge } from 'zutron/main';
 import MenuBuilder from './menu';
+import { store } from './store/create';
 import { resolveHtmlPath } from './util';
+import { rootReducer } from './store';
 
 class AppUpdater {
   constructor() {
@@ -110,6 +113,12 @@ const createWindow = async () => {
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
   new AppUpdater();
+
+  const { unsubscribe } = mainZustandBridge(ipcMain, store, [mainWindow], {
+    reducer: rootReducer,
+  });
+
+  app.on('quit', unsubscribe);
 };
 
 /**

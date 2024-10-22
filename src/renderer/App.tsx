@@ -12,8 +12,17 @@ import {
   extendTheme,
 } from '@chakra-ui/react';
 import { FaGithub } from 'react-icons/fa';
+import { useStore } from './hooks/useStore';
+import { useDispatch } from 'zutron';
 
-function Hello() {
+function TestZustand() {
+  const { counter } = useStore();
+  const dispatch = useDispatch(window.zutron);
+  const onClick = () => dispatch('COUNTER:SET', counter + 5);
+  return <Box onClick={onClick}>{counter}</Box>;
+}
+
+function Main() {
   return (
     <Box position="relative" w="100%" h="100vh" p={4}>
       <Box position="absolute" top={0} right={0}>
@@ -81,6 +90,7 @@ function Hello() {
           </Button>
         </HStack>
       </VStack>
+      <TestZustand />
     </Box>
   );
 }
@@ -101,7 +111,7 @@ export default function App() {
       <Box bg="rgb(240, 238, 229)" minHeight="100vh">
         <Router>
           <Routes>
-            <Route path="/" element={<Hello />} />
+            <Route path="/" element={<Main />} />
           </Routes>
         </Router>
       </Box>
