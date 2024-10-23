@@ -8,6 +8,7 @@ import { desktopCapturer, screen } from 'electron';
 import { anthropic } from './anthropic';
 import { AppState, NextAction } from './types';
 import { extractAction } from './extractAction';
+import { hideWindowBlock, showWindow } from '../window';
 
 const MAX_STEPS = 50;
 
@@ -41,21 +42,23 @@ const getScreenshot = async () => {
   const { width, height } = primaryDisplay.size;
   const aiDimensions = getAiScaledScreenDimensions();
 
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: { width, height },
-  });
-  const primarySource = sources[0]; // Assuming the first source is the primary display
+  await hideWindowBlock(async () => {
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width, height },
+    });
+    const primarySource = sources[0]; // Assuming the first source is the primary display
 
-  if (primarySource) {
-    const screenshot = primarySource.thumbnail;
-    // Resize the screenshot to AI dimensions
-    const resizedScreenshot = screenshot.resize(aiDimensions);
-    // Convert the resized screenshot to a base64-encoded PNG
-    const base64Image = resizedScreenshot.toPNG().toString('base64');
-    return base64Image;
-  }
-  throw new Error('No display found for screenshot');
+    if (primarySource) {
+      const screenshot = primarySource.thumbnail;
+      // Resize the screenshot to AI dimensions
+      const resizedScreenshot = screenshot.resize(aiDimensions);
+      // Convert the resized screenshot to a base64-encoded PNG
+      const base64Image = resizedScreenshot.toPNG().toString('base64');
+      return base64Image;
+    }
+    throw new Error('No display found for screenshot');
+  });
 };
 
 const mapToAiSpace = (x: number, y: number) => {
@@ -246,7 +249,8 @@ export const runAgent = async (
       if (!getState().running) {
         break;
       }
-      performAction(action);
+
+      hideWindowBlock(() => performAction(action));
 
       await new Promise((resolve) => setTimeout(resolve, 500));
       if (!getState().running) {
