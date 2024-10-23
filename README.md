@@ -1,8 +1,8 @@
 Presenting **Agent.exe**: the easiest way to let Claude's new [computer use](https://www.anthropic.com/news/3-5-models-and-computer-use) capabilities take over your computer!
 
-<img width="374" alt="agent-exe" src="https://github.com/user-attachments/assets/26410465-bd70-4c02-89e5-26766de73f68">
+<img width="387" alt="buy pizza" src="https://github.com/user-attachments/assets/c11cc8f1-6dcb-48f4-9d18-682f14edb77d">
 
-https://github.com/user-attachments/assets/c544f7a5-7575-400f-891c-27279c4a2f96
+https://github.com/user-attachments/assets/2a371241-bc43-46d4-896e-256b3adc388d
 
 ### Motivation
 
