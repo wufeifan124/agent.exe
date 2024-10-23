@@ -83,6 +83,7 @@ const createWindow = async () => {
     y: height - 600, // Position from bottom edge
     frame: false, // Remove default frame
     transparent: true, // Optional: enables transparency
+    alwaysOnTop: true, // Keep window on top
     icon: getAssetPath('icon.png'),
     webPreferences: {
       preload: app.isPackaged

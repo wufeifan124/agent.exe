@@ -1,22 +1,15 @@
-import { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/messages/messages';
-import { Button, keyboard, mouse, Point } from '@nut-tree-fork/nut-js';
+import {
+  BetaMessage,
+  BetaMessageParam,
+} from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import { Button, Key, keyboard, mouse, Point } from '@nut-tree-fork/nut-js';
+// import { createCanvas, loadImage } from 'canvas';
 import { desktopCapturer, screen } from 'electron';
 import { anthropic } from './anthropic';
-import { AppState } from './types';
+import { AppState, NextAction } from './types';
+import { extractAction } from './extractAction';
 
-type NextAction =
-  | { type: 'key'; text: string }
-  | { type: 'type'; text: string }
-  | { type: 'mouse_move'; x: number; y: number }
-  | { type: 'left_click' }
-  | { type: 'left_click_drag'; x: number; y: number }
-  | { type: 'right_click' }
-  | { type: 'middle_click' }
-  | { type: 'double_click' }
-  | { type: 'screenshot' }
-  | { type: 'cursor_position' }
-  | { type: 'finish' }
-  | { type: 'error'; message: string };
+const MAX_STEPS = 15;
 
 function getScreenDimensions(): { width: number; height: number } {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -88,11 +81,9 @@ const mapFromAiSpace = (x: number, y: number) => {
   };
 };
 
-const getNextAction = async (
+const promptForAction = async (
   runHistory: BetaMessageParam[],
-): Promise<{ action: NextAction; reasoning?: string }> => {
-  console.log('RUN HISTORY', JSON.stringify(runHistory, null, 2));
-
+): Promise<BetaMessageParam> => {
   const message = await anthropic.beta.messages.create({
     model: 'claude-3-5-sonnet-20241022',
     max_tokens: 1024,
@@ -104,104 +95,49 @@ const getNextAction = async (
         display_height_px: getAiScaledScreenDimensions().height,
         display_number: 1,
       },
+      {
+        name: 'finish_run',
+        description:
+          'Call this function when you have achieved the goal of the task.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              description: 'Whether the task was successful',
+            },
+            error: {
+              type: 'string',
+              description: 'The error message if the task was not successful',
+            },
+          },
+          required: ['success'],
+        },
+      },
     ],
     system: `The user will ask you to perform a task and you should use their computer to do so. After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. Explicitly show your thinking: "I have evaluated step X..." If not correct, try again. Only when you confirm a step was executed correctly should you move on to the next one.`,
     messages: runHistory,
     betas: ['computer-use-2024-10-22'],
   });
 
-  console.log(JSON.stringify(message, null, 2));
-
-  const reasoning = message.content
-    .filter((content) => content.type === 'text')
-    .map((content) => content.text)
-    .join(' ');
-
-  const lastMessage = message.content[message.content.length - 1];
-
-  if (lastMessage.type !== 'tool_use') {
-    return {
-      action: { type: 'error', message: 'No tool called' },
-      reasoning,
-    };
-  }
-  if (lastMessage.name !== 'computer') {
-    return {
-      action: {
-        type: 'error',
-        message: `Wrong tool called: ${lastMessage.name}`,
-      },
-      reasoning,
-    };
-  }
-
-  const { action, coordinate, text } = lastMessage.input as {
-    action: string;
-    coordinate?: [number, number];
-    text?: string;
-  };
-
-  // Convert toolUse into NextAction
-  let nextAction: NextAction;
-  switch (action) {
-    case 'type':
-    case 'key':
-      if (!text) {
-        nextAction = {
-          type: 'error',
-          message: `No text provided for ${action}`,
-        };
-      } else {
-        nextAction = { type: action, text };
-      }
-      break;
-    case 'mouse_move':
-      if (!coordinate) {
-        nextAction = { type: 'error', message: 'No coordinate provided' };
-      } else {
-        const [x, y] = coordinate;
-        nextAction = { type: 'mouse_move', x, y };
-      }
-      break;
-    case 'left_click':
-      nextAction = { type: 'left_click' };
-      break;
-    case 'left_click_drag':
-      nextAction = { type: 'left_click_drag', x, y };
-      break;
-    case 'right_click':
-      nextAction = { type: 'right_click' };
-      break;
-    case 'middle_click':
-      nextAction = { type: 'middle_click' };
-      break;
-    case 'double_click':
-      nextAction = { type: 'double_click' };
-      break;
-    case 'screenshot':
-      nextAction = { type: 'screenshot' };
-      break;
-    case 'cursor_position':
-      nextAction = { type: 'cursor_position' };
-      break;
-    case 'finish':
-      nextAction = { type: 'finish' };
-      break;
-    default:
-      nextAction = {
-        type: 'error',
-        message: `Unsupported computer action: ${action}`,
-      };
-  }
-
-  return { action: nextAction, reasoning };
+  return { content: message.content, role: message.role };
 };
 
 export const performAction = async (action: NextAction) => {
   switch (action.type) {
     case 'mouse_move':
-      const { x, y } = action;
+      const { x, y } = mapFromAiSpace(action.x, action.y);
       await mouse.setPosition(new Point(x, y));
+      break;
+    case 'left_click_drag':
+      const { x: dragX, y: dragY } = mapFromAiSpace(action.x, action.y);
+      const currentPosition = await mouse.getPosition();
+      await mouse.drag([currentPosition, new Point(dragX, dragY)]);
+      break;
+    case 'cursor_position':
+      const position = await mouse.getPosition();
+      const aiPosition = mapToAiSpace(position.x, position.y);
+      // TODO: actually return the position
       break;
     case 'left_click':
       await mouse.leftClick();
@@ -215,56 +151,65 @@ export const performAction = async (action: NextAction) => {
     case 'double_click':
       await mouse.doubleClick(Button.LEFT);
       break;
-    case 'left_click_drag':
-      const { x: dragX, y: dragY } = action;
-      const currentPosition = await mouse.getPosition();
-      await mouse.drag([currentPosition, new Point(dragX, dragY)]);
-      break;
     case 'type':
-    case 'key':
+      // Set typing delay to 0ms for instant typing
+      keyboard.config.autoDelayMs = 0;
       await keyboard.type(action.text);
+      // Reset delay back to default if needed
+      keyboard.config.autoDelayMs = 500;
       break;
-    case 'cursor_position':
-      const position = await mouse.getPosition();
-      console.log(`Cursor position: x=${position.x}, y=${position.y}`);
+    case 'key':
+      const keyMap = {
+        Return: Key.Enter,
+      };
+      const keys = action.text.split('+').map((key) => {
+        const mappedKey = keyMap[key as keyof typeof keyMap];
+        if (!mappedKey) {
+          throw new Error(`Tried to press unknown key: ${key}`);
+        }
+        return mappedKey;
+      });
+      await keyboard.pressKey(...keys);
       break;
     case 'screenshot':
       // Don't do anything since we always take a screenshot after each step
       break;
     default:
-      console.warn(`Unsupported action: ${action.type}`);
+      throw new Error(`Unsupported action: ${action.type}`);
   }
 };
 
-export const startRun = async (
+export const runAgent = async (
   setState: (state: AppState) => void,
   getState: () => AppState,
 ) => {
-  const initialMessage: BetaMessageParam = {
-    role: 'user',
-    content: [
-      { type: 'text', text: getState().instructions ?? '' },
-      {
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: 'image/png',
-          data: await getScreenshot(),
-        },
-      },
-    ],
-  };
-
   setState({
     ...getState(),
     running: true,
-    runHistory: [initialMessage],
+    runHistory: [{ role: 'user', content: getState().instructions ?? '' }],
     error: null,
   });
 
   while (getState().running) {
+    // Add this check at the start of the loop
+    if (getState().runHistory.length >= MAX_STEPS * 2) {
+      setState({
+        ...getState(),
+        error: 'Maximum steps exceeded',
+        running: false,
+      });
+      break;
+    }
+
     try {
-      const { action, reasoning } = await getNextAction(getState().runHistory);
+      const message = await promptForAction(getState().runHistory);
+      setState({
+        ...getState(),
+        runHistory: [...getState().runHistory, message],
+      });
+      const { action, reasoning, toolId } = extractAction(
+        message as BetaMessage,
+      );
       console.log('REASONING', reasoning);
       console.log('ACTION', action);
 
@@ -274,26 +219,63 @@ export const startRun = async (
           error: action.message,
           running: false,
         });
+        break;
       } else if (action.type === 'finish') {
         setState({
           ...getState(),
           running: false,
         });
-      } else {
-        performAction(action);
+        break;
       }
-    } catch (error) {
-      console.error('Error in startRun:', error);
+      if (!getState().running) {
+        break;
+      }
+      performAction(action);
+      // Wait for 1 second to make sure the action is complete
+      await new Promise((resolve) => {
+        setTimeout(resolve, 1000);
+      });
+      if (!getState().running) {
+        break;
+      }
+
       setState({
         ...getState(),
-        error: 'An error occurred',
+        runHistory: [
+          ...getState().runHistory,
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: toolId,
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Here is a screenshot after the action was executed',
+                  },
+                  {
+                    type: 'image',
+                    source: {
+                      type: 'base64',
+                      media_type: 'image/png',
+                      data: await getScreenshot(),
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    } catch (error: unknown) {
+      setState({
+        ...getState(),
+        error:
+          error instanceof Error ? error.message : 'An unknown error occurred',
         running: false,
       });
+      break;
     }
-
-    setState({
-      ...getState(),
-      running: false,
-    });
   }
 };

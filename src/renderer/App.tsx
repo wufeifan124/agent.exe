@@ -10,12 +10,14 @@ import {
   VStack,
   extendTheme,
   Spinner,
+  useToast,
 } from '@chakra-ui/react';
-import { FaGithub, FaStop } from 'react-icons/fa';
+import { FaGithub, FaStop, FaTrash } from 'react-icons/fa';
 import { HiMinus, HiX } from 'react-icons/hi';
 import { Route, MemoryRouter as Router, Routes } from 'react-router-dom';
 import { useDispatch } from 'zutron';
 import { useStore } from './hooks/useStore';
+import { RunHistory } from './RunHistory';
 
 function Main() {
   const dispatch = useDispatch(window.zutron);
@@ -23,16 +25,19 @@ function Main() {
     instructions: savedInstructions,
     humanSupervised,
     running,
+    error,
+    runHistory,
   } = useStore();
   // Add local state for instructions
   const [localInstructions, setLocalInstructions] = React.useState(
     savedInstructions ?? '',
   );
+  const toast = useToast(); // Add toast hook
 
   const startRun = () => {
     // Update Zustand state before starting the run
     dispatch({ type: 'SET_INSTRUCTIONS', payload: localInstructions });
-    dispatch({ type: 'START_RUN', payload: null });
+    dispatch({ type: 'RUN_AGENT', payload: null });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -95,7 +100,7 @@ function Main() {
       </HStack>
 
       <VStack
-        spacing={6}
+        spacing={4}
         align="center"
         h="100%"
         w="100%"
@@ -146,17 +151,42 @@ function Main() {
           <HStack spacing={2}>
             <Switch
               isChecked={humanSupervised}
-              onChange={(e) =>
-                dispatch({
-                  type: 'SET_HUMAN_SUPERVISED',
-                  payload: e.target.checked,
-                })
-              }
+              onChange={(e) => {
+                toast({
+                  description:
+                    "Whoops, human supervision isn't actually implemented yet. 😬",
+                  status: 'info',
+                  duration: 3000,
+                  isClosable: true,
+                });
+              }}
             />
             <Box>Human Supervision</Box>
           </HStack>
           <HStack>
             {running && <Spinner size="sm" color="gray.500" mr={2} />}
+            {!running && runHistory.length > 0 && (
+              <Button
+                bg="transparent"
+                fontWeight="normal"
+                _hover={{
+                  bg: 'whiteAlpha.500',
+                  borderColor: 'blackAlpha.300',
+                  boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+                }}
+                _focus={{
+                  boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+                  outline: 'none',
+                }}
+                borderRadius="12px"
+                border="1px solid"
+                borderColor="blackAlpha.200"
+                onClick={() => dispatch({ type: 'CLEAR_HISTORY' })}
+                aria-label="Clear history"
+              >
+                <FaTrash />
+              </Button>
+            )}
             <Button
               bg="transparent"
               fontWeight="normal"
@@ -179,8 +209,19 @@ function Main() {
             </Button>
           </HStack>
         </HStack>
+
+        {/* Add error display */}
+        {error && (
+          <Box w="100%" color="red.700">
+            {error}
+          </Box>
+        )}
+
+        {/* RunHistory component */}
+        <Box flex="1" w="100%" overflow="auto">
+          <RunHistory />
+        </Box>
       </VStack>
-      {/* <TestZustand /> */}
     </Box>
   );
 }
