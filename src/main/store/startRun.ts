@@ -1,8 +1,6 @@
-import fs from 'fs';
+import { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/messages/messages';
+import { Button, keyboard, mouse, Point } from '@nut-tree-fork/nut-js';
 import { desktopCapturer, screen } from 'electron';
-import os from 'os';
-import path from 'path';
-import { keyboard, mouse, Point, Button } from '@nut-tree-fork/nut-js';
 import { anthropic } from './anthropic';
 import { AppState } from './types';
 
@@ -63,7 +61,7 @@ const getScreenshot = async () => {
       const resizedScreenshot = screenshot.resize(aiDimensions);
       // Convert the resized screenshot to a base64-encoded PNG
       const base64Image = resizedScreenshot.toPNG().toString('base64');
-      return `data:image/png;base64,${base64Image}`;
+      return base64Image;
     }
     throw new Error('No display found for screenshot');
   } catch (error) {
@@ -91,8 +89,10 @@ const mapFromAiSpace = (x: number, y: number) => {
 };
 
 const getNextAction = async (
-  instructions: string,
+  runHistory: BetaMessageParam[],
 ): Promise<{ action: NextAction; reasoning?: string }> => {
+  console.log('RUN HISTORY', JSON.stringify(runHistory, null, 2));
+
   const message = await anthropic.beta.messages.create({
     model: 'claude-3-5-sonnet-20241022',
     max_tokens: 1024,
@@ -106,7 +106,7 @@ const getNextAction = async (
       },
     ],
     system: `The user will ask you to perform a task and you should use their computer to do so. After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. Explicitly show your thinking: "I have evaluated step X..." If not correct, try again. Only when you confirm a step was executed correctly should you move on to the next one.`,
-    messages: [{ role: 'user', content: instructions }],
+    messages: runHistory,
     betas: ['computer-use-2024-10-22'],
   });
 
@@ -229,8 +229,7 @@ export const performAction = async (action: NextAction) => {
       console.log(`Cursor position: x=${position.x}, y=${position.y}`);
       break;
     case 'screenshot':
-      const screenshot = await getScreenshot();
-      console.log('SCREENSHOT', screenshot);
+      // Don't do anything since we always take a screenshot after each step
       break;
     default:
       console.warn(`Unsupported action: ${action.type}`);
@@ -240,60 +239,61 @@ export const performAction = async (action: NextAction) => {
 export const startRun = async (
   setState: (state: AppState) => void,
   getState: () => AppState,
-  payload: { instructions: string; humanSupervised: boolean },
 ) => {
+  const initialMessage: BetaMessageParam = {
+    role: 'user',
+    content: [
+      { type: 'text', text: getState().instructions ?? '' },
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/png',
+          data: await getScreenshot(),
+        },
+      },
+    ],
+  };
+
   setState({
     ...getState(),
-    ...payload,
     running: true,
+    runHistory: [initialMessage],
+    error: null,
   });
 
-  // Capture high-quality screenshot
-  try {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.size;
+  while (getState().running) {
+    try {
+      const { action, reasoning } = await getNextAction(getState().runHistory);
+      console.log('REASONING', reasoning);
+      console.log('ACTION', action);
 
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width, height },
-    });
-    const primarySource = sources[0]; // Assuming the first source is the primary display
-
-    if (primarySource) {
-      const screenshot = primarySource.thumbnail;
-      // save to desktop
-      const desktopPath = path.join(os.homedir(), 'Desktop');
-      const screenshotPath = path.join(
-        desktopPath,
-        'high_quality_screenshot.png',
-      );
-      fs.writeFileSync(screenshotPath, screenshot.toPNG());
-
-      console.log(
-        `Screenshot captured at native resolution: ${width}x${height}`,
-      );
-    } else {
-      console.error('No display found for screenshot');
+      if (action.type === 'error') {
+        setState({
+          ...getState(),
+          error: action.message,
+          running: false,
+        });
+      } else if (action.type === 'finish') {
+        setState({
+          ...getState(),
+          running: false,
+        });
+      } else {
+        performAction(action);
+      }
+    } catch (error) {
+      console.error('Error in startRun:', error);
+      setState({
+        ...getState(),
+        error: 'An error occurred',
+        running: false,
+      });
     }
-  } catch (error) {
-    console.error('Error capturing screenshot:', error);
-  }
 
-  const { action, reasoning } = await getNextAction(payload.instructions);
-  console.log('REASONING', reasoning);
-  console.log('ACTION', action);
-
-  if (action.type === 'error') {
-    setState({
-      ...getState(),
-      error: action.message,
-    });
-  } else if (action.type === 'finish') {
     setState({
       ...getState(),
       running: false,
     });
-  } else {
-    performAction(action);
   }
 };

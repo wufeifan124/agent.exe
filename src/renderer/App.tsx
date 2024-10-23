@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Box,
   Button,
@@ -5,32 +6,34 @@ import {
   HStack,
   Heading,
   Link,
-  Radio,
-  RadioGroup,
+  Switch,
   VStack,
   extendTheme,
+  Spinner,
 } from '@chakra-ui/react';
-import { FaGithub } from 'react-icons/fa';
+import { FaGithub, FaStop } from 'react-icons/fa';
+import { HiMinus, HiX } from 'react-icons/hi';
 import { Route, MemoryRouter as Router, Routes } from 'react-router-dom';
 import { useDispatch } from 'zutron';
 import { useStore } from './hooks/useStore';
-import { useState } from 'react';
-
-function TestZustand() {
-  const { counter } = useStore();
-  const dispatch = useDispatch(window.zutron);
-
-  const onClick = () => dispatch({ type: 'SET_COUNTER', payload: counter + 3 });
-  return <Box onClick={onClick}>{counter}</Box>;
-}
 
 function Main() {
   const dispatch = useDispatch(window.zutron);
-  const [instructions, setInstructions] = useState('');
-  const [humanSupervised, setHumanSupervised] = useState(true);
+  const {
+    instructions: savedInstructions,
+    humanSupervised,
+    running,
+  } = useStore();
+  // Add local state for instructions
+  const [localInstructions, setLocalInstructions] = React.useState(
+    savedInstructions ?? '',
+  );
 
-  const startRun = () =>
-    dispatch({ type: 'START_RUN', payload: { instructions, humanSupervised } });
+  const startRun = () => {
+    // Update Zustand state before starting the run
+    dispatch({ type: 'SET_INSTRUCTIONS', payload: localInstructions });
+    dispatch({ type: 'START_RUN', payload: null });
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.metaKey && !e.shiftKey) {
@@ -40,76 +43,141 @@ function Main() {
   };
 
   return (
-    <Box position="relative" w="100%" h="100vh" p={4}>
-      <Box position="absolute" top={0} right={0}>
-        <Link href="https://github.com/corbt/agent.exe" isExternal>
-          <Button variant="ghost" size="lg" aria-label="GitHub">
-            <FaGithub />
-          </Button>
-        </Link>
-      </Box>
-      <VStack spacing={6} align="center" h="100%" w="100%" justify="center">
+    <Box
+      position="relative"
+      w="100%"
+      h="100vh"
+      p={4}
+      sx={{
+        '-webkit-app-region': 'drag', // Make the background draggable
+      }}
+    >
+      {/* Title heading no longer needs drag property since parent is draggable */}
+      <Box position="absolute" top={2} left={6}>
         <Heading fontFamily="Garamond, serif" fontWeight="hairline">
           Agent.exe
         </Heading>
+      </Box>
+
+      {/* Window controls and GitHub button moved together */}
+      <HStack
+        position="absolute"
+        top={2}
+        right={2}
+        spacing={0}
+        sx={{
+          '-webkit-app-region': 'no-drag',
+        }}
+      >
+        <Link href="https://github.com/corbt/agent.exe" isExternal>
+          <Button variant="ghost" size="sm" aria-label="GitHub" minW={8} p={0}>
+            <FaGithub />
+          </Button>
+        </Link>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => window.electron.windowControls.minimize()}
+          minW={8}
+          p={0}
+        >
+          <HiMinus />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => window.electron.windowControls.close()}
+          minW={8}
+          p={0}
+        >
+          <HiX />
+        </Button>
+      </HStack>
+
+      <VStack
+        spacing={6}
+        align="center"
+        h="100%"
+        w="100%"
+        pt={16}
+        sx={{
+          '& > *': {
+            // Make all direct children non-draggable
+            '-webkit-app-region': 'no-drag',
+          },
+        }}
+      >
         <Box
           as="textarea"
           placeholder="What can I do for you today?"
           width="100%"
-          height="100px"
+          height="auto"
+          minHeight="48px"
           p={4}
           borderRadius="16px"
           border="1px solid"
           borderColor="rgba(112, 107, 87, 0.5)"
           verticalAlign="top"
           resize="none"
-          transition="box-shadow 0.2s, border-color 0.2s"
-          _hover={{
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+          overflow="hidden"
+          sx={{
+            '-webkit-app-region': 'no-drag',
+            transition: 'box-shadow 0.2s, border-color 0.2s',
+            _hover: {
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+            },
+            _focus: {
+              borderColor: 'blackAlpha.500',
+              outline: 'none',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+            },
           }}
-          _focus={{
-            borderColor: 'blackAlpha.500',
-            outline: 'none',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          value={localInstructions}
+          disabled={running}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            setLocalInstructions(e.target.value);
+            // Auto-adjust height
+            e.target.style.height = 'auto';
+            e.target.style.height = `${e.target.scrollHeight}px`;
           }}
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
           onKeyDown={handleKeyDown}
         />
         <HStack justify="space-between" align="center" w="100%">
-          <RadioGroup
-            value={humanSupervised ? 'human' : 'lucky'}
-            onChange={(value) => setHumanSupervised(value === 'human')}
-          >
-            <HStack spacing={4}>
-              <Radio value="human" bg="whiteAlpha.700">
-                Human Supervised
-              </Radio>
-              <Radio value="lucky" bg="whiteAlpha.700">
-                I'm Feeling Lucky
-              </Radio>
-            </HStack>
-          </RadioGroup>
-          <Button
-            bg="transparent"
-            fontWeight="normal"
-            _hover={{
-              bg: 'whiteAlpha.500',
-              borderColor: 'blackAlpha.300',
-              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
-            }}
-            _focus={{
-              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
-              outline: 'none',
-            }}
-            borderRadius="12px"
-            border="1px solid"
-            borderColor="blackAlpha.200"
-            onClick={startRun}
-            isDisabled={instructions.trim() === ''}
-          >
-            Let&apos;s Go
-          </Button>
+          <HStack spacing={2}>
+            <Switch
+              isChecked={humanSupervised}
+              onChange={(e) =>
+                dispatch({
+                  type: 'SET_HUMAN_SUPERVISED',
+                  payload: e.target.checked,
+                })
+              }
+            />
+            <Box>Human Supervision</Box>
+          </HStack>
+          <HStack>
+            {running && <Spinner size="sm" color="gray.500" mr={2} />}
+            <Button
+              bg="transparent"
+              fontWeight="normal"
+              _hover={{
+                bg: 'whiteAlpha.500',
+                borderColor: 'blackAlpha.300',
+                boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+              }}
+              _focus={{
+                boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+                outline: 'none',
+              }}
+              borderRadius="12px"
+              border="1px solid"
+              borderColor="blackAlpha.200"
+              onClick={running ? () => dispatch('STOP_RUN') : startRun}
+              isDisabled={!running && localInstructions?.trim() === ''}
+            >
+              {running ? <FaStop /> : "Let's Go"}
+            </Button>
+          </HStack>
         </HStack>
       </VStack>
       {/* <TestZustand /> */}
@@ -122,6 +190,18 @@ const theme = extendTheme({
     global: {
       body: {
         color: 'rgb(83, 81, 70)',
+      },
+    },
+  },
+  components: {
+    Switch: {
+      baseStyle: {
+        track: {
+          bg: 'blackAlpha.200',
+          _checked: {
+            bg: '#c79060',
+          },
+        },
       },
     },
   },

@@ -25,6 +25,12 @@ const electronHandler = {
       ipcRenderer.once(channel, (_event, ...args) => func(...args));
     },
   },
+  // Add window controls
+  windowControls: {
+    minimize: () => ipcRenderer.invoke('minimize-window'),
+    maximize: () => ipcRenderer.invoke('maximize-window'),
+    close: () => ipcRenderer.invoke('close-window'),
+  },
 };
 
 // Initialize Zutron bridge

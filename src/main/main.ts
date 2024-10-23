@@ -8,7 +8,7 @@
  * When running `npm run build` or `npm run build:main`, this file is compiled to
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, screen } from 'electron';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
@@ -16,7 +16,6 @@ import { mainZustandBridge } from 'zutron/main';
 import MenuBuilder from './menu';
 import { store } from './store/create';
 import { resolveHtmlPath } from './util';
-import { rootReducer } from './store';
 
 class AppUpdater {
   constructor() {
@@ -72,10 +71,18 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
+  // Get the primary display's work area (screen size minus taskbar/dock)
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
   mainWindow = new BrowserWindow({
     show: false,
-    width: 600,
-    height: 300,
+    width: 400,
+    height: 600,
+    x: width - 400, // Position from right edge
+    y: height - 600, // Position from bottom edge
+    frame: false, // Remove default frame
+    transparent: true, // Optional: enables transparency
     icon: getAssetPath('icon.png'),
     webPreferences: {
       preload: app.isPackaged
@@ -119,6 +126,23 @@ const createWindow = async () => {
   });
 
   app.on('quit', unsubscribe);
+
+  // Add these window control handlers
+  ipcMain.handle('minimize-window', () => {
+    mainWindow?.minimize();
+  });
+
+  ipcMain.handle('maximize-window', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow?.unmaximize();
+    } else {
+      mainWindow?.maximize();
+    }
+  });
+
+  ipcMain.handle('close-window', () => {
+    mainWindow?.close();
+  });
 };
 
 /**

@@ -4,13 +4,15 @@ import { AppState } from './types';
 import { startRun } from './startRun';
 
 export const store = createStore<AppState>((set, get) => ({
-  instructions: null,
-  humanSupervised: true,
-  running: false,
+  instructions: 'Click the search bar', // Default value
+  humanSupervised: true, // Default value
+  running: true,
   error: null,
-  START_RUN: async (payload) => {
-    startRun(set, get, payload);
-  },
+  runHistory: [],
+  START_RUN: async () => startRun(set, get),
+  STOP_RUN: () => set({ running: false }), // Add this line
+  SET_INSTRUCTIONS: (instructions) => set({ instructions }),
+  SET_HUMAN_SUPERVISED: (humanSupervised) => set({ humanSupervised }),
 }));
 
 export const dispatch = createDispatch(store);

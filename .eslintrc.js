@@ -16,6 +16,7 @@ module.exports = {
     'import/prefer-default-export': 'off',
     'no-restricted-syntax': 'off',
     'no-case-declarations': 'off',
+    'no-await-in-loop': 'off',
   },
   parserOptions: {
     ecmaVersion: 2022,
