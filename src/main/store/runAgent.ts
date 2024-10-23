@@ -9,7 +9,7 @@ import { anthropic } from './anthropic';
 import { AppState, NextAction } from './types';
 import { extractAction } from './extractAction';
 
-const MAX_STEPS = 15;
+const MAX_STEPS = 50;
 
 function getScreenDimensions(): { width: number; height: number } {
   const primaryDisplay = screen.getPrimaryDisplay();
@@ -41,26 +41,21 @@ const getScreenshot = async () => {
   const { width, height } = primaryDisplay.size;
   const aiDimensions = getAiScaledScreenDimensions();
 
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width, height },
-    });
-    const primarySource = sources[0]; // Assuming the first source is the primary display
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: { width, height },
+  });
+  const primarySource = sources[0]; // Assuming the first source is the primary display
 
-    if (primarySource) {
-      const screenshot = primarySource.thumbnail;
-      // Resize the screenshot to AI dimensions
-      const resizedScreenshot = screenshot.resize(aiDimensions);
-      // Convert the resized screenshot to a base64-encoded PNG
-      const base64Image = resizedScreenshot.toPNG().toString('base64');
-      return base64Image;
-    }
-    throw new Error('No display found for screenshot');
-  } catch (error) {
-    console.error('Error capturing screenshot:', error);
-    throw error;
+  if (primarySource) {
+    const screenshot = primarySource.thumbnail;
+    // Resize the screenshot to AI dimensions
+    const resizedScreenshot = screenshot.resize(aiDimensions);
+    // Convert the resized screenshot to a base64-encoded PNG
+    const base64Image = resizedScreenshot.toPNG().toString('base64');
+    return base64Image;
   }
+  throw new Error('No display found for screenshot');
 };
 
 const mapToAiSpace = (x: number, y: number) => {
@@ -84,6 +79,26 @@ const mapFromAiSpace = (x: number, y: number) => {
 const promptForAction = async (
   runHistory: BetaMessageParam[],
 ): Promise<BetaMessageParam> => {
+  // Strip images from all but the last message
+  const historyWithoutImages = runHistory.map((msg, index) => {
+    if (index === runHistory.length - 1) return msg; // Keep the last message intact
+    if (Array.isArray(msg.content)) {
+      return {
+        ...msg,
+        content: msg.content.map((item) => {
+          if (item.type === 'tool_result' && typeof item.content !== 'string') {
+            return {
+              ...item,
+              content: item.content?.filter((c) => c.type !== 'image'),
+            };
+          }
+          return item;
+        }),
+      };
+    }
+    return msg;
+  });
+
   const message = await anthropic.beta.messages.create({
     model: 'claude-3-5-sonnet-20241022',
     max_tokens: 1024,
@@ -115,8 +130,9 @@ const promptForAction = async (
         },
       },
     ],
-    system: `The user will ask you to perform a task and you should use their computer to do so. After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. Explicitly show your thinking: "I have evaluated step X..." If not correct, try again. Only when you confirm a step was executed correctly should you move on to the next one.`,
-    messages: runHistory,
+    system: `The user will ask you to perform a task and you should use their computer to do so. After each step, take a screenshot and carefully evaluate if you have achieved the right outcome. Explicitly show your thinking: "I have evaluated step X..." If not correct, try again. Only when you confirm a step was executed correctly should you move on to the next one. Note that you have to click into the browser address bar before typing a URL. You should always call a tool! Always return a tool call. Remember call the finish_run tool when you have achieved the goal of the task. Do not explain you have finished the task, just call the tool. Use keyboard shortcuts to navigate whenever possible.`,
+    // tool_choice: { type: 'any' },
+    messages: historyWithoutImages,
     betas: ['computer-use-2024-10-22'],
   });
 
@@ -231,10 +247,8 @@ export const runAgent = async (
         break;
       }
       performAction(action);
-      // Wait for 1 second to make sure the action is complete
-      await new Promise((resolve) => {
-        setTimeout(resolve, 1000);
-      });
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
       if (!getState().running) {
         break;
       }

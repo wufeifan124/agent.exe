@@ -23,7 +23,7 @@ function Main() {
   const dispatch = useDispatch(window.zutron);
   const {
     instructions: savedInstructions,
-    humanSupervised,
+    fullyAuto,
     running,
     error,
     runHistory,
@@ -150,18 +150,18 @@ function Main() {
         <HStack justify="space-between" align="center" w="100%">
           <HStack spacing={2}>
             <Switch
-              isChecked={humanSupervised}
+              isChecked={fullyAuto}
               onChange={(e) => {
                 toast({
                   description:
-                    "Whoops, human supervision isn't actually implemented yet. 😬",
+                    "Whoops, automatic mode isn't actually implemented yet. 😬",
                   status: 'info',
                   duration: 3000,
                   isClosable: true,
                 });
               }}
             />
-            <Box>Human Supervision</Box>
+            <Box>Full Auto</Box>
           </HStack>
           <HStack>
             {running && <Spinner size="sm" color="gray.500" mr={2} />}
@@ -181,7 +181,7 @@ function Main() {
                 borderRadius="12px"
                 border="1px solid"
                 borderColor="blackAlpha.200"
-                onClick={() => dispatch({ type: 'CLEAR_HISTORY' })}
+                onClick={() => dispatch('CLEAR_HISTORY')}
                 aria-label="Clear history"
               >
                 <FaTrash />

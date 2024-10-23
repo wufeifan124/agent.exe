@@ -16,7 +16,7 @@ export type NextAction =
 
 export type AppState = {
   instructions: string | null;
-  humanSupervised: boolean;
+  fullyAuto: boolean;
   running: boolean;
   error: string | null;
 
@@ -25,6 +25,6 @@ export type AppState = {
   RUN_AGENT: () => void;
   STOP_RUN: () => void;
   SET_INSTRUCTIONS: (instructions: string) => void;
-  SET_HUMAN_SUPERVISED: (humanSupervised: boolean) => void;
+  SET_FULLY_AUTO: (fullyAuto: boolean) => void;
   CLEAR_HISTORY: () => void;
 };

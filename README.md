@@ -5,7 +5,7 @@ To run:
 1.  `git clone https://github.com/corbt/agent.exe`
 2.  `cd agent.exe`
 3.  `npm install`
-4.  `ANTHROPIC_API_KEY=<your-key> npm start`
+4.  `ANTHROPIC_API_KEY="<your-anthropic-api-key>" npm start`
 5.  Prompt the model to do something interesting on your computer!
 
 Supported systems:

@@ -77,10 +77,10 @@ const createWindow = async () => {
 
   mainWindow = new BrowserWindow({
     show: false,
-    width: 400,
+    width: 350,
     height: 600,
-    x: width - 400, // Position from right edge
-    y: height - 600, // Position from bottom edge
+    x: width - 350, // Position from right edge
+    y: 0, // Position from top edge (changed from: y: height - 500)
     frame: false, // Remove default frame
     transparent: true, // Optional: enables transparency
     alwaysOnTop: true, // Keep window on top
