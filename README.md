@@ -13,8 +13,9 @@ I wanted to see how good Claude's new [computer use](https://www.anthropic.com/n
 1.  `git clone https://github.com/corbt/agent.exe`
 2.  `cd agent.exe`
 3.  `npm install`
-4.  `ANTHROPIC_API_KEY="<your-anthropic-api-key>" npm start`
-5.  Prompt the model to do something interesting on your computer!
+4.  Rename `.env.example` --> `.env` and add your Anthropic API Key
+5.  `npm start`
+6.  Prompt the model to do something interesting on your computer!
 
 ### Supported systems
 
