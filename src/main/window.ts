@@ -93,10 +93,10 @@ export async function hideWindowBlock<T>(
   operation: () => Promise<T> | T,
 ): Promise<T> {
   try {
-    showWindow(false); // Hide the window before operation
-    const result = await Promise.resolve(operation()); // Handle both async and sync operations
+    showWindow(false);
+    const result = await Promise.resolve(operation());
     return result;
   } finally {
-    showWindow(true); // Ensure window is shown even if operation fails
+    showWindow(true);
   }
 }
