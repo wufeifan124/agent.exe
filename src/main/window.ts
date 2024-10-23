@@ -70,6 +70,12 @@ export async function createMainWindow(
   ipcMain.handle('close-window', () => {
     mainWindow?.close();
   });
+  app.on('activate', () => {
+    // On macOS it's common to re-create a window in the app when the
+    // dock icon is clicked and there are no other windows open.
+    if (mainWindow === null) createMainWindow(getAssetPath);
+  });
+
   return mainWindow;
 }
 
