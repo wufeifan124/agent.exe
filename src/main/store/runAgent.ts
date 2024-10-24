@@ -37,12 +37,12 @@ function getAiScaledScreenDimensions(): { width: number; height: number } {
   return { width: scaledWidth, height: scaledHeight };
 }
 
-const getScreenshot = async () => {
+const getScreenshot = async (): Promise<string> => {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.size;
   const aiDimensions = getAiScaledScreenDimensions();
 
-  await hideWindowBlock(async () => {
+  return hideWindowBlock(async () => {
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
       thumbnailSize: { width, height },
