@@ -9,45 +9,7 @@ let showTimeout: NodeJS.Timeout | null = null;
 
 const FADE_STEP = 0.1;
 const FADE_INTERVAL = 16;
-const SHOW_DELAY = 500; // 1 second delay before showing
-
-function fadeWindow(show: boolean, immediate = false): Promise<void> {
-  return new Promise((resolve) => {
-    if (!mainWindow) {
-      resolve();
-      return;
-    }
-
-    // Clear any existing fade animation
-    if (fadeInterval) {
-      clearInterval(fadeInterval);
-    }
-
-    // For hide operations, execute immediately
-    if (!show) {
-      // Clear any pending show operations
-      if (showTimeout) {
-        clearTimeout(showTimeout);
-        showTimeout = null;
-      }
-      executeFade(show, resolve);
-      return;
-    }
-
-    // For show operations, debounce unless immediate is true
-    if (showTimeout) {
-      clearTimeout(showTimeout);
-    }
-
-    if (immediate) {
-      executeFade(show, resolve);
-    } else {
-      showTimeout = setTimeout(() => {
-        executeFade(show, resolve);
-      }, SHOW_DELAY);
-    }
-  });
-}
+const SHOW_DELAY = 500;
 
 function executeFade(show: boolean, resolve: () => void) {
   if (!mainWindow) {
@@ -55,7 +17,6 @@ function executeFade(show: boolean, resolve: () => void) {
     return;
   }
 
-  // If showing, make sure window is visible before starting fade
   if (show) {
     mainWindow.setOpacity(0);
     mainWindow.showInactive();
@@ -80,6 +41,40 @@ function executeFade(show: boolean, resolve: () => void) {
       resolve();
     }
   }, FADE_INTERVAL);
+}
+
+function fadeWindow(show: boolean, immediate = false): Promise<void> {
+  return new Promise((resolve) => {
+    if (!mainWindow) {
+      resolve();
+      return;
+    }
+
+    if (fadeInterval) {
+      clearInterval(fadeInterval);
+    }
+
+    if (!show) {
+      if (showTimeout) {
+        clearTimeout(showTimeout);
+        showTimeout = null;
+      }
+      executeFade(show, resolve);
+      return;
+    }
+
+    if (showTimeout) {
+      clearTimeout(showTimeout);
+    }
+
+    if (immediate) {
+      executeFade(show, resolve);
+    } else {
+      showTimeout = setTimeout(() => {
+        executeFade(show, resolve);
+      }, SHOW_DELAY);
+    }
+  });
 }
 
 export async function createMainWindow(
