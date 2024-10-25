@@ -8,14 +8,13 @@
  * When running `npm run build` or `npm run build:main`, this file is compiled to
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
-import { app, BrowserWindow, ipcMain, shell, screen } from 'electron';
+import { app, ipcMain } from 'electron';
 import log from 'electron-log';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import { mainZustandBridge } from 'zutron/main';
-import MenuBuilder from './menu';
+import { createMainWindow } from './window';
 import { store } from './store/create';
-import { resolveHtmlPath } from './util';
 
 class AppUpdater {
   constructor() {
@@ -24,8 +23,6 @@ class AppUpdater {
     autoUpdater.checkForUpdatesAndNotify();
   }
 }
-
-let mainWindow: BrowserWindow | null = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
@@ -58,7 +55,7 @@ const installExtensions = async () => {
     .catch(console.log);
 };
 
-const createWindow = async () => {
+const initializeApp = async () => {
   if (isDebug) {
     await installExtensions();
   }
@@ -71,52 +68,7 @@ const createWindow = async () => {
     return path.join(RESOURCES_PATH, ...paths);
   };
 
-  // Get the primary display's work area (screen size minus taskbar/dock)
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-
-  mainWindow = new BrowserWindow({
-    show: false,
-    width: 350,
-    height: 600,
-    x: width - 350, // Position from right edge
-    y: 0, // Position from top edge (changed from: y: height - 500)
-    frame: false, // Remove default frame
-    transparent: true, // Optional: enables transparency
-    alwaysOnTop: true, // Keep window on top
-    icon: getAssetPath('icon.png'),
-    webPreferences: {
-      preload: app.isPackaged
-        ? path.join(__dirname, 'preload.js')
-        : path.join(__dirname, '../../.erb/dll/preload.js'),
-    },
-  });
-
-  mainWindow.loadURL(resolveHtmlPath('index.html'));
-
-  mainWindow.on('ready-to-show', () => {
-    if (!mainWindow) {
-      throw new Error('"mainWindow" is not defined');
-    }
-    if (process.env.START_MINIMIZED) {
-      mainWindow.minimize();
-    } else {
-      mainWindow.show();
-    }
-  });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  const menuBuilder = new MenuBuilder(mainWindow);
-  menuBuilder.buildMenu();
-
-  // Open urls in the user's browser
-  mainWindow.webContents.setWindowOpenHandler((edata) => {
-    shell.openExternal(edata.url);
-    return { action: 'deny' };
-  });
+  const mainWindow = await createMainWindow(getAssetPath);
 
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
@@ -127,23 +79,6 @@ const createWindow = async () => {
   });
 
   app.on('quit', unsubscribe);
-
-  // Add these window control handlers
-  ipcMain.handle('minimize-window', () => {
-    mainWindow?.minimize();
-  });
-
-  ipcMain.handle('maximize-window', () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow?.unmaximize();
-    } else {
-      mainWindow?.maximize();
-    }
-  });
-
-  ipcMain.handle('close-window', () => {
-    mainWindow?.close();
-  });
 };
 
 /**
@@ -160,12 +95,7 @@ app.on('window-all-closed', () => {
 
 app
   .whenReady()
-  .then(() => {
-    createWindow();
-    app.on('activate', () => {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
-      if (mainWindow === null) createWindow();
-    });
+  .then(async () => {
+    await initializeApp();
   })
   .catch(console.log);
